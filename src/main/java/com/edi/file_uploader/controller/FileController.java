@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/files")
@@ -62,119 +65,68 @@ public class FileController {
         }
     }
 
+
     private String processContent(String content) {
-        String[] lines = content.split("\\r?\\n"); // Divida o conteúdo por linhas
-        StringBuilder result = new StringBuilder();
+        String[] lines = content.split("\\r?\\n"); // Divide o conteúdo por linhas
+        List<String[]> tabela = new ArrayList<>();
 
         for (String line : lines) {
-            // Remover espaços extras antes de processar
             line = line.trim();
 
-            // Verificar se a linha tem 128 caracteres
             if (line.length() <= 128) {
                 if (line.startsWith("PE1")) {
-                    // Processar PE1
-                    result.append("---------------------------------COMEÇO PEDIDO---------------------------------\n");
-                    result.append("TRADUÇÃO PE1\n");
-                    result.append("----------------------------------------------------------------------------------\n");
-                    result.append("Identificação do tipo de registro (campo 1 ao 3): ").append(line.substring(0, 3)).append("\n");
-                    result.append("Código da Fábrica Entrega (campo 4 ao 6): ").append(getField(line, 3, 6)).append("\n");
-                    result.append("Identificação programa atual (campo 7 ao 15): ").append(getField(line, 6, 15)).append("\n");
-                    result.append("Data do programa atual (campo 16 ao 21): ").append(getField(line, 15, 21)).append("\n");
-                    result.append("Identificação programa anterior (campo 22 ao 30): ").append(getField(line, 21, 30)).append("\n");
-                    result.append("Data do programa anterior (campo 31 ao 36): ").append(getField(line, 30, 36)).append("\n");
-                    result.append("Código do item do cliente (campo 37 ao 66): ").append(getField(line, 36, 66)).append("\n");
-                    result.append("Código do item do fornecedor (campo 67 ao 96): ").append(getField(line, 66, 96)).append("\n");
-                    result.append("Número do pedido de compra (campo 97 ao 108): ").append(getField(line, 96, 108)).append("\n");
-                    result.append("Código local do destino (campo 109 ao 113): ").append(getField(line, 108, 113)).append("\n");
-                    result.append("Identificação para contato (campo 114 ao 124): ").append(getField(line, 113, 124)).append("\n");
-                    result.append("Código unidade de medida (campo 125 ao 126): ").append(getField(line, 124, 126)).append("\n");
-                    result.append("Quantidade de casas decimais (campo 127): ").append(getField(line, 126, 127)).append("\n");
-                    result.append("Código tipo de fornecimento (campo 128): ").append(getField(line, 127, 128)).append("\n");
-                    result.append("----------------------------------------------------------------------------------\n");
-                } else if (line.startsWith("PE2")) {
-                    // Processar PE2
-                    result.append("----------------------------------------------------------------------------------\n");
-                    result.append("TRADUÇÃO PE2\n");
-                    result.append("----------------------------------------------------------------------------------\n");
-                    result.append("Identificação do tipo de Registro: ").append(line.substring(0, 3)).append("\n");
-                    result.append("Data Da ultima entrega: ").append(getField(line, 3, 9)).append("\n");
-                    result.append("Numero Ultima Nota Fiscal: ").append(getField(line, 9, 15)).append("\n");
-                    result.append("Série Ultima Nota Fiscal: ").append(getField(line, 15, 19)).append("\n");
-                    result.append("Data da ultima Nota fiscal: ").append(getField(line, 19, 25)).append("\n");
-                    result.append("Quantidade da Ultima Entrega: ").append(getField(line, 25, 37)).append("\n");
-                    result.append("Quantidade de entrega acumulada: ").append(getField(line, 37, 51)).append("\n");
-                    result.append("Quantidade Necessária acumulada: ").append(getField(line, 51, 65)).append("\n");
-                    result.append("Quantidade lote minimo: ").append(getField(line, 65, 77)).append("\n");
-                    result.append("CÓDIGO FREQUENCIA DE FORNECIMENTO: ").append(getField(line, 77, 80)).append("\n");
-                    result.append("DATA LIBERAÇÃO PARA PRODUÇÃO: ").append(getField(line, 80, 84)).append("\n");
-                    result.append("DATA LIBERAÇÃO MATÉRIA PRIMA: ").append(getField(line, 84, 88)).append("\n");
-                    result.append("CÓDIGO LOCAL DE DESCARGA: ").append(getField(line, 88, 95)).append("\n");
-                    result.append("PERÍODO DE ENTREGA/EMBARQUE: ").append(getField(line, 95, 99)).append("\n");
-                    result.append("CÓDIGO SITUAÇÃO DO ITEM: ").append(getField(line, 99, 101)).append("\n");
-                    result.append("IDENTIFICAÇÃO DO TIPO DE PROGRAMAÇÃO: ").append(getField(line, 101, 102)).append("\n");
-                    result.append("PERÍODO DE ENTREGA/EMBARQUE: ").append(getField(line, 102, 116)).append("\n");
-                    result.append("PEDIDO DA REVENDA: ").append(getField(line, 116, 127)).append("\n");
-                    result.append("QUALIFICAÇÃO DA PROGRAMAÇÃO: ").append(getField(line, 127, 128)).append("\n");
-                    result.append("TIPO DE PEDIDO DA REVENDA: ").append(getField(line, 128, 130)).append("\n");
-                    result.append("CÓDIGO DA VIA DE TRANSPORTE: ").append(getField(line, 130, 133)).append("\n");
-                    result.append("ESPAÇOS: ").append(getField(line, 133, 256)).append("\n");
-                    result.append("----------------------------------------------------------------------------------\n");
-                } else  if (line.startsWith("PE3")) {
-                    // Processar PE3
-                    result.append("----------------------------------------------------------------------------------\n");
-                    result.append("TRADUÇÃO PE3\n");
-                    result.append("----------------------------------------------------------------------------------\n");
-                    result.append("Identificação do tipo de Registro: ").append(line.substring(0, 3)).append("\n");
-                    result.append("Data Entrega/Embarque do Item: ").append(getField(line, 3, 9)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item: ").append(getField(line, 9, 11)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item: ").append(getField(line, 11, 20)).append("\n");
-                    result.append("Data Entrega/Embarque do Item (1): ").append(getField(line, 20, 26)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item (2): ").append(getField(line, 26, 28)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item (3): ").append(getField(line, 28, 37)).append("\n");
-                    result.append("Data Entrega/Embarque do Item (2): ").append(getField(line, 36, 42)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item (3): ").append(getField(line, 42, 44)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item (4): ").append(getField(line, 44, 54)).append("\n");
-                    result.append("Data Entrega/Embarque do Item (3): ").append(getField(line, 54, 60)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item (4): ").append(getField(line, 60, 62)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item (5): ").append(getField(line, 62, 71)).append("\n");
-                    result.append("Data Entrega/Embarque do Item (4): ").append(getField(line, 71, 77)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item (5): ").append(getField(line, 77, 79)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item (6): ").append(getField(line, 79, 88)).append("\n");
-                    result.append("Data Entrega/Embarque do Item (5): ").append(getField(line, 88, 94)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item (6): ").append(getField(line, 94, 96)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item (7): ").append(getField(line, 96, 105)).append("\n");
-                    result.append("Data Entrega/Embarque do Item (6): ").append(getField(line, 105, 111)).append("\n");
-                    result.append("Hora para Entrega/Embarque Item (7): ").append(getField(line, 111, 113)).append("\n");
-                    result.append("Quantidade Entrega/Embarque do Item (8): ").append(getField(line, 113, 122)).append("\n");
-                    result.append("Espaços: ").append(getField(line, 122, 128)).append("\n");
-                    result.append("---------------------------------FIM DO PEDIDO---------------------------------\n");
-                    result.append("-------------------------------------------------------------------------------\n");
-                    
-                    
-                    String Pedido = getField(line, 97, 108);
-                    String dataCriacao = getField(line, 31, 36);
-                    String codigo = getField(line, 31, 36);
-                    String quantidade = getField(line, 31, 36);
-                    String dataEntrega = getField(line, 31, 36);
-                    StringBuilder dadosExportacao = new StringBuilder();
-                    
-                    
-                    dadosExportacao.append("Número do pedido de compra (campo 97 ao 108): ").append(Pedido).append("\n");
-                    dadosExportacao.append("Data do programa anterior (campo 31 ao 36): ").append(dataCriacao).append("\n");
-                    dadosExportacao.append("Código do item do cliente (campo 37 ao 66): ").append(codigo).append("\n");
-                    dadosExportacao.append("Quantidade Entrega/Embarque do Item: ").append(quantidade).append("\n");
-                    dadosExportacao.append("Data Entrega/Embarque do Item: ").append(dataEntrega).append("\n");
-                    
-                    
+                    String pedido = getField(line, 96, 108).trim();
+                    String dataCriacao = getField(line, 30, 36).trim();
+                    String codigo = getField(line, 36, 66).trim();
+
+                    tabela.add(new String[]{pedido, dataCriacao, codigo, "", ""}); // Quantidade e Data Entrega vazias
+                } else if (line.startsWith("PE3")) {
+                    String quantidade = getField(line, 11, 20).trim();
+                    String dataEntrega = getField(line, 3, 9).trim();
+
+                    if (!tabela.isEmpty()) {
+                        String[] ultimaLinha = tabela.get(tabela.size() - 1);
+                        tabela.add(new String[]{ultimaLinha[0], ultimaLinha[1], ultimaLinha[2], quantidade, dataEntrega});
+                    }
                 }
-            } else {
-                result.append("Linha ignorada por não ter 128 caracteres: ").append(line).append("\n");
             }
+        }
+
+        // Calcular larguras de colunas
+        int[] colWidths = { "Pedido".length(), "Data Criação".length(), "Código".length(), "Quantidade".length(), "Data de entrega".length() };
+
+        for (String[] linha : tabela) {
+            for (int i = 0; i < linha.length; i++) {
+                colWidths[i] = Math.max(colWidths[i], linha[i].length());
+            }
+        }
+
+        // Construir a tabela formatada
+        StringBuilder result = new StringBuilder();
+        result.append(formatLine(new String[]{"Pedido", "Data Criação", "Código", "Quantidade", "Data de entrega"}, colWidths));
+        result.append(formatLine(new String[]{"-" + "-".repeat(colWidths[0] - 2), "-" + "-".repeat(colWidths[1] - 2), "-" + "-".repeat(colWidths[2] - 2), "-" + "-".repeat(colWidths[3] - 2), "-" + "-".repeat(colWidths[4] - 2)}, colWidths));
+
+        for (String[] linha : tabela) {
+            result.append(formatLine(linha, colWidths));
         }
 
         return result.toString();
     }
+
+    private String formatLine(String[] values, int[] colWidths) {
+        StringBuilder line = new StringBuilder("|");
+        for (int i = 0; i < values.length; i++) {
+            line.append(" ").append(padRight(values[i], colWidths[i])).append(" |");
+        }
+        line.append("\n");
+        return line.toString();
+    }
+
+    private String padRight(String text, int length) {
+        return text + " ".repeat(Math.max(0, length - text.length()));
+    }
+
+
     
 
 
