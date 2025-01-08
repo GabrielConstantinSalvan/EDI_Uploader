@@ -7,6 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -67,72 +69,149 @@ public class FileController {
 
 
     private String processContent(String content) {
-        String[] lines = content.split("\\r?\\n"); // Divide o conteúdo por linhas
+        String[] lines = content.split("\\r?\\n"); // Divide o conteúdo em linhas
         List<String[]> tabela = new ArrayList<>();
+
+        // Variáveis temporárias para armazenar dados do EDI
+        String pedidoAtual = "";
+        String dataCriacaoAtual = "";
+        String codigoAtual = "";
 
         for (String line : lines) {
             line = line.trim();
 
-            if (line.length() <= 128) {
+            if (line.length() <= 128) { // Verifica se a linha tem o tamanho esperado
                 if (line.startsWith("PE1")) {
-                    String pedido = getField(line, 96, 108).trim();
-                    String dataCriacao = getField(line, 30, 36).trim();
-                    String codigo = getField(line, 36, 66).trim();
-
-                    tabela.add(new String[]{pedido, dataCriacao, codigo, "", ""}); // Quantidade e Data Entrega vazias
+                    // Extração de dados da linha PE1
+                    pedidoAtual = getFieldSafe(line, 96, 108); // Número do pedido de compra
+                    dataCriacaoAtual = getFieldSafe(line, 15, 21); // Data do programa atual
+                    codigoAtual = getFieldSafe(line, 36, 66); // Código do item do cliente
                 } else if (line.startsWith("PE3")) {
-                    String quantidade = getField(line, 11, 20).trim();
-                    String dataEntrega = getField(line, 3, 9).trim();
+                    // Extração de dados da linha PE3
+                    String quantidade1 = formatDecimal(getFieldSafe(line, 28, 37));
+                    String dataEntrega1 = formatDate(getFieldSafe(line, 20, 26));
 
-                    if (!tabela.isEmpty()) {
-                        String[] ultimaLinha = tabela.get(tabela.size() - 1);
-                        tabela.add(new String[]{ultimaLinha[0], ultimaLinha[1], ultimaLinha[2], quantidade, dataEntrega});
-                    }
+                    String quantidade2 = formatDecimal(getFieldSafe(line, 45, 54));
+                    String dataEntrega2 = formatDate(getFieldSafe(line, 37, 43));
+
+                    String quantidade3 = formatDecimal(getFieldSafe(line, 62, 71));
+                    String dataEntrega3 = formatDate(getFieldSafe(line, 54, 60));
+
+                    String quantidade4 = formatDecimal(getFieldSafe(line, 79, 88));
+                    String dataEntrega4 = formatDate(getFieldSafe(line, 71, 77));
+
+                    String quantidade5 = formatDecimal(getFieldSafe(line, 96, 105));
+                    String dataEntrega5 = formatDate(getFieldSafe(line, 88, 94));
+
+                    String quantidade6 = formatDecimal(getFieldSafe(line, 113, 122));
+                    String dataEntrega6 = formatDate(getFieldSafe(line, 105, 111));
+
+                    // Adiciona os dados extraídos à tabela
+                    tabela.add(new String[]{pedidoAtual, dataCriacaoAtual, codigoAtual, quantidade1, dataEntrega1, quantidade2, dataEntrega2, quantidade3, dataEntrega3, quantidade4, dataEntrega4, quantidade5, dataEntrega5, quantidade6, dataEntrega6});
                 }
+            } else {
+                System.err.println("Linha ignorada por ser menor que 128 caracteres: " + line);
             }
         }
 
-        // Calcular larguras de colunas
-        int[] colWidths = { "Pedido".length(), "Data Criação".length(), "Código".length(), "Quantidade".length(), "Data de entrega".length() };
+        // Construção da tabela formatada
+        return buildTable(tabela);
+    }
 
-        for (String[] linha : tabela) {
-            for (int i = 0; i < linha.length; i++) {
-                colWidths[i] = Math.max(colWidths[i], linha[i].length());
+    // Método auxiliar para formatar um valor como decimal
+    private String formatDecimal(String value) {
+        try {
+            if (value != null && !value.isEmpty()) {
+                BigDecimal decimalValue = new BigDecimal(value.trim());
+                return decimalValue.setScale(0, RoundingMode.HALF_UP).toString();
+            } else {
+                return "0.00";
             }
+        } catch (NumberFormatException e) {
+            System.err.println("Erro ao converter para decimal: " + value);
+            return "0.00";
         }
-
-        // Construir a tabela formatada
-        StringBuilder result = new StringBuilder();
-        result.append(formatLine(new String[]{"Pedido", "Data Criação", "Código", "Quantidade", "Data de entrega"}, colWidths));
-        result.append(formatLine(new String[]{"-" + "-".repeat(colWidths[0] - 2), "-" + "-".repeat(colWidths[1] - 2), "-" + "-".repeat(colWidths[2] - 2), "-" + "-".repeat(colWidths[3] - 2), "-" + "-".repeat(colWidths[4] - 2)}, colWidths));
-
-        for (String[] linha : tabela) {
-            result.append(formatLine(linha, colWidths));
-        }
-
-        return result.toString();
-    }
-
-    private String formatLine(String[] values, int[] colWidths) {
-        StringBuilder line = new StringBuilder("|");
-        for (int i = 0; i < values.length; i++) {
-            line.append(" ").append(padRight(values[i], colWidths[i])).append(" |");
-        }
-        line.append("\n");
-        return line.toString();
-    }
-
-    private String padRight(String text, int length) {
-        return text + " ".repeat(Math.max(0, length - text.length()));
     }
 
 
-    
+ // Método auxiliar para formatar datas no formato dd-mm-aa
+    private String formatDate(String value) {
+        if (value == null || value.isEmpty() || value.equals("000000")) {
+            return "N/A";
+        }
+
+        try {
+            // Verifica se o tamanho do campo é válido para uma data
+            if (value.length() == 6) {
+                String ano = value.substring(0, 2);
+                String mes = value.substring(2, 4);
+                String dia = value.substring(4, 6);
+                return dia + "-" + mes + "-" + ano;
+            } else {
+                System.err.println("Formato de data inválido: " + value);
+                return "N/A";
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao formatar data: " + value + " - " + e.getMessage());
+            return "N/A";
+        }
+    }
+
+
+
+
+
+
+    private String buildTable(List<String[]> tabela) {
+        StringBuilder builder = new StringBuilder();
+
+        // Cabeçalho da tabela
+        builder.append("| Pedido     | Data Criação | Código         | Quantidade 1  |Data de entrega 1| Quantidade 2   | Data de entrega 2 | Quantidade 3   | Data de entrega 3 | Quantidade 4   | Data de entrega 4 | Quantidade 5   | Data de entrega 5 | Quantidade 6   | Data de entrega 6 |\n");
+        builder.append("|------------|--------------|----------------|---------------|-----------------|----------------|-------------------|----------------|-------------------|----------------|-------------------|----------------|-------------------|----------------|-------------------|\n");
+
+        // Linhas da tabela
+        for (String[] row : tabela) {
+            builder.append(String.format("| %-10s | %-12s | %-14s | %-13s | %-15s | %-14s | %-17s | %-14s | %-17s | %-14s | %-17s | %-14s | %-17s | %-14s | %-17s |\n",
+                row[0] != null ? row[0] : "N/A",
+                row[1] != null ? row[1] : "N/A",
+                row[2] != null ? row[2] : "N/A",
+                row[3] != null ? row[3] : "N/A",
+                row[4] != null ? row[4] : "N/A",
+                row[5] != null ? row[5] : "N/A",
+                row[6] != null ? row[6] : "N/A",
+                row[7] != null ? row[7] : "N/A",
+                row[8] != null ? row[8] : "N/A",
+                row[9] != null ? row[9] : "N/A",
+                row[10] != null ? row[10] : "N/A",
+                row[11] != null ? row[11] : "N/A",
+                row[12] != null ? row[12] : "N/A",
+                row[13] != null ? row[13] : "N/A",
+                row[14] != null ? row[14] : "N/A"));
+        }
+
+        return builder.toString();
+    }
+
+
+
+
 
 
     // Método auxiliar para preencher espaços em branco
-    private String getField(String line, int start, int end) {
-        String field = line.length() >= end ? line.substring(start, end) : "";
-        return field + " ".repeat(end - start - field.length());
+    private String getFieldSafe(String line, int start, int end) {
+        try {
+            if (line.length() >= end) {
+                return line.substring(start, end).trim();
+            } else {
+                System.err.println("Campo fora do limite na linha: " + line);
+                return null;
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao extrair campo: " + e.getMessage());
+            return null;
+        }
     }
+
+
+
 }
