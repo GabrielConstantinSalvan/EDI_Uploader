@@ -11,9 +11,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+
 
 
 @RestController
@@ -35,48 +37,14 @@ public class FileController {
         }
     }
 
-    @PostMapping("/upload")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Nenhum arquivo enviado.");
-        }
-
-        try {
-            // Recupera o arquivo temporário gerado pelo Tomcat
-            String tempFilePath = System.getProperty("java.io.tmpdir") + "/" + file.getOriginalFilename();
-            Path tempFile = Path.of(tempFilePath);
-            
-            // Salva o arquivo temporário no diretório
-            Files.write(tempFile, file.getBytes());
-
-            // Caminho do arquivo final
-            Path finalFile = Path.of(uploadDir + file.getOriginalFilename());
-
-            // Move o arquivo temporário para o diretório de upload
-            Files.move(tempFile, finalFile, StandardCopyOption.REPLACE_EXISTING);
-
-            // Processa o conteúdo do arquivo
-            String content = new String(file.getBytes());
-            String processedContent = processContent(content);
-
-            // Retorna o conteúdo processado
-            return ResponseEntity.ok("Arquivo salvo com sucesso em: " + finalFile.toString() + "\nConteúdo Processado:\n" + processedContent);
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro ao mover o arquivo: " + e.getMessage());
-        }
-    }
-
-
-    private String processContent(String content) {
+    private List<Map<String, Object>> processContent(String content) {
         String[] lines = content.split("\\r?\\n"); // Divide o conteúdo em linhas
-        List<String[]> tabela = new ArrayList<>();
+        List<Map<String, Object>> pedidos = new ArrayList<>();
 
-        // Variáveis temporárias para armazenar dados do EDI
-        String pedidoAtual = "";
+       
         String dataCriacaoAtual = "";
         String codigoAtual = "";
-        int casasDecimais = 0; // Armazena a quantidade de casas decimais
+        int casasDecimais = 0;
 
         for (String line : lines) {
             line = line.trim();
@@ -84,11 +52,10 @@ public class FileController {
             if (line.length() <= 128) { // Verifica se a linha tem o tamanho esperado
                 if (line.startsWith("PE1")) {
                     // Extração de dados da linha PE1
-                    pedidoAtual = getFieldSafe(line, 96, 108); // Número do pedido de compra
-                    dataCriacaoAtual = getFieldSafe(line, 15, 21); // Data do programa atual
+                    
+                    dataCriacaoAtual = formatDate(getFieldSafe(line, 15, 21)); // Data do programa atual
                     codigoAtual = getFieldSafe(line, 36, 66); // Código do item do cliente
 
-                    // Extração do campo 127 (quantidade de casas decimais)
                     String casasDecimaisStr = getFieldSafe(line, 126, 127); // Campo 127
                     try {
                         casasDecimais = Integer.parseInt(casasDecimaisStr != null ? casasDecimaisStr : "0");
@@ -97,36 +64,61 @@ public class FileController {
                         casasDecimais = 0; // Valor padrão
                     }
                 } else if (line.startsWith("PE3")) {
-                    // Extração de dados da linha PE3
-                    String quantidade1 = formatDecimal(getFieldSafe(line, 28, 37), casasDecimais);
-                    String dataEntrega1 = formatDate(getFieldSafe(line, 20, 26));
+                    // Extrai os itens do pedido
+                    Map<String, Object> pedido = new HashMap<>();
+                    pedido.put("data_criacao", dataCriacaoAtual);
+                    pedido.put("codigo", codigoAtual);
 
-                    String quantidade2 = formatDecimal(getFieldSafe(line, 45, 54), casasDecimais);
-                    String dataEntrega2 = formatDate(getFieldSafe(line, 37, 43));
+                    List<Map<String, String>> itens = new ArrayList<>();
+                    for (int i = 0; i < 6; i++) {
+                        int startQuantidade = 11 + (17 * i);
+                        int endQuantidade = startQuantidade + 9;
+                        int startData = 3 + (17 * i);
+                        int endData = startData + 6;
 
-                    String quantidade3 = formatDecimal(getFieldSafe(line, 62, 71), casasDecimais);
-                    String dataEntrega3 = formatDate(getFieldSafe(line, 54, 60));
+                        String quantidade = formatDecimal(getFieldSafe(line, startQuantidade, endQuantidade), casasDecimais);
+                        String dataEntrega = formatDate(getFieldSafe(line, startData, endData));
+                        
+                        
 
-                    String quantidade4 = formatDecimal(getFieldSafe(line, 79, 88), casasDecimais);
-                    String dataEntrega4 = formatDate(getFieldSafe(line, 71, 77));
 
-                    String quantidade5 = formatDecimal(getFieldSafe(line, 96, 105), casasDecimais);
-                    String dataEntrega5 = formatDate(getFieldSafe(line, 88, 94));
+                        Map<String, String> item = new HashMap<>();
+                        item.put("quantidade", quantidade);
+                        item.put("data_entrega", dataEntrega);
 
-                    String quantidade6 = formatDecimal(getFieldSafe(line, 113, 122), casasDecimais);
-                    String dataEntrega6 = formatDate(getFieldSafe(line, 105, 111));
-
-                    // Adiciona os dados extraídos à tabela
-                    tabela.add(new String[]{pedidoAtual, dataCriacaoAtual, codigoAtual, quantidade1, dataEntrega1, quantidade2, dataEntrega2, quantidade3, dataEntrega3, quantidade4, dataEntrega4, quantidade5, dataEntrega5, quantidade6, dataEntrega6});
+                        itens.add(item);
+                    }
+                    pedido.put("itens", itens);
+                    pedidos.add(pedido);
                 }
             } else {
                 System.err.println("Linha ignorada por ser menor que 128 caracteres: " + line);
             }
         }
-
-        // Construção da tabela formatada
-        return buildTable(tabela);
+        return pedidos;
+        
     }
+
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Nenhum arquivo enviado.");
+        }
+
+        try {
+            Path finalFile = Path.of(uploadDir + file.getOriginalFilename());
+            Files.write(finalFile, file.getBytes());
+
+            String content = new String(file.getBytes());
+            List<Map<String, Object>> processedContent = processContent(content);
+
+            return ResponseEntity.ok(processedContent); // Retorna como JSON
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao processar o arquivo: " + e.getMessage());
+        }
+    }
+
 
     // Método auxiliar para formatar um valor como decimal, levando em conta o número de casas decimais
     private String formatDecimal(String value, int casasDecimais) {
@@ -167,45 +159,6 @@ public class FileController {
             return "N/A";
         }
     }
-
-
-
-
-
-
-    private String buildTable(List<String[]> tabela) {
-        StringBuilder builder = new StringBuilder();
-
-        // Cabeçalho da tabela
-        builder.append("| Pedido     | Data Criação | Código         | Quantidade 1  |Data de entrega 1| Quantidade 2   | Data de entrega 2 | Quantidade 3   | Data de entrega 3 | Quantidade 4   | Data de entrega 4 | Quantidade 5   | Data de entrega 5 | Quantidade 6   | Data de entrega 6 |\n");
-        builder.append("|------------|--------------|----------------|---------------|-----------------|----------------|-------------------|----------------|-------------------|----------------|-------------------|----------------|-------------------|----------------|-------------------|\n");
-
-        // Linhas da tabela
-        for (String[] row : tabela) {
-            builder.append(String.format("| %-10s | %-12s | %-14s | %-13s | %-15s | %-14s | %-17s | %-14s | %-17s | %-14s | %-17s | %-14s | %-17s | %-14s | %-17s |\n",
-                row[0] != null ? row[0] : "N/A",
-                row[1] != null ? row[1] : "N/A",
-                row[2] != null ? row[2] : "N/A",
-                row[3] != null ? row[3] : "N/A",
-                row[4] != null ? row[4] : "N/A",
-                row[5] != null ? row[5] : "N/A",
-                row[6] != null ? row[6] : "N/A",
-                row[7] != null ? row[7] : "N/A",
-                row[8] != null ? row[8] : "N/A",
-                row[9] != null ? row[9] : "N/A",
-                row[10] != null ? row[10] : "N/A",
-                row[11] != null ? row[11] : "N/A",
-                row[12] != null ? row[12] : "N/A",
-                row[13] != null ? row[13] : "N/A",
-                row[14] != null ? row[14] : "N/A"));
-        }
-
-        return builder.toString();
-    }
-
-
-
-
 
 
     // Método auxiliar para preencher espaços em branco
