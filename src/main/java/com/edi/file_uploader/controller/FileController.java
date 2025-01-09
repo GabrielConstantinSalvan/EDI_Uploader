@@ -76,6 +76,7 @@ public class FileController {
         String pedidoAtual = "";
         String dataCriacaoAtual = "";
         String codigoAtual = "";
+        int casasDecimais = 0; // Armazena a quantidade de casas decimais
 
         for (String line : lines) {
             line = line.trim();
@@ -86,24 +87,33 @@ public class FileController {
                     pedidoAtual = getFieldSafe(line, 96, 108); // Número do pedido de compra
                     dataCriacaoAtual = getFieldSafe(line, 15, 21); // Data do programa atual
                     codigoAtual = getFieldSafe(line, 36, 66); // Código do item do cliente
+
+                    // Extração do campo 127 (quantidade de casas decimais)
+                    String casasDecimaisStr = getFieldSafe(line, 126, 127); // Campo 127
+                    try {
+                        casasDecimais = Integer.parseInt(casasDecimaisStr != null ? casasDecimaisStr : "0");
+                    } catch (NumberFormatException e) {
+                        System.err.println("Erro ao converter casas decimais: " + casasDecimaisStr);
+                        casasDecimais = 0; // Valor padrão
+                    }
                 } else if (line.startsWith("PE3")) {
                     // Extração de dados da linha PE3
-                    String quantidade1 = formatDecimal(getFieldSafe(line, 28, 37));
+                    String quantidade1 = formatDecimal(getFieldSafe(line, 28, 37), casasDecimais);
                     String dataEntrega1 = formatDate(getFieldSafe(line, 20, 26));
 
-                    String quantidade2 = formatDecimal(getFieldSafe(line, 45, 54));
+                    String quantidade2 = formatDecimal(getFieldSafe(line, 45, 54), casasDecimais);
                     String dataEntrega2 = formatDate(getFieldSafe(line, 37, 43));
 
-                    String quantidade3 = formatDecimal(getFieldSafe(line, 62, 71));
+                    String quantidade3 = formatDecimal(getFieldSafe(line, 62, 71), casasDecimais);
                     String dataEntrega3 = formatDate(getFieldSafe(line, 54, 60));
 
-                    String quantidade4 = formatDecimal(getFieldSafe(line, 79, 88));
+                    String quantidade4 = formatDecimal(getFieldSafe(line, 79, 88), casasDecimais);
                     String dataEntrega4 = formatDate(getFieldSafe(line, 71, 77));
 
-                    String quantidade5 = formatDecimal(getFieldSafe(line, 96, 105));
+                    String quantidade5 = formatDecimal(getFieldSafe(line, 96, 105), casasDecimais);
                     String dataEntrega5 = formatDate(getFieldSafe(line, 88, 94));
 
-                    String quantidade6 = formatDecimal(getFieldSafe(line, 113, 122));
+                    String quantidade6 = formatDecimal(getFieldSafe(line, 113, 122), casasDecimais);
                     String dataEntrega6 = formatDate(getFieldSafe(line, 105, 111));
 
                     // Adiciona os dados extraídos à tabela
@@ -118,20 +128,21 @@ public class FileController {
         return buildTable(tabela);
     }
 
-    // Método auxiliar para formatar um valor como decimal
-    private String formatDecimal(String value) {
+    // Método auxiliar para formatar um valor como decimal, levando em conta o número de casas decimais
+    private String formatDecimal(String value, int casasDecimais) {
         try {
             if (value != null && !value.isEmpty()) {
                 BigDecimal decimalValue = new BigDecimal(value.trim());
-                return decimalValue.setScale(0, RoundingMode.HALF_UP).toString();
+                return decimalValue.setScale(casasDecimais, RoundingMode.HALF_UP).toString();
             } else {
-                return "0.00";
+                return casasDecimais == 0 ? "0" : "0.00";
             }
         } catch (NumberFormatException e) {
             System.err.println("Erro ao converter para decimal: " + value);
-            return "0.00";
+            return casasDecimais == 0 ? "0" : "0.00";
         }
     }
+
 
 
  // Método auxiliar para formatar datas no formato dd-mm-aa
