@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 
 
@@ -43,6 +44,7 @@ public class FileController {
 
        
         String dataCriacaoAtual = "";
+        String numero_Pedido_De_Compra = "";
         String codigoAtual = "";
         int casasDecimais = 0;
 
@@ -55,7 +57,8 @@ public class FileController {
                     
                     dataCriacaoAtual = formatDate(getFieldSafe(line, 15, 21)); // Data do programa atual
                     codigoAtual = getFieldSafe(line, 36, 66); // Código do item do cliente
-
+                    numero_Pedido_De_Compra = getFieldSafe(line, 96, 108);
+                    
                     String casasDecimaisStr = getFieldSafe(line, 126, 127); // Campo 127
                     try {
                         casasDecimais = Integer.parseInt(casasDecimaisStr != null ? casasDecimaisStr : "0");
@@ -64,33 +67,32 @@ public class FileController {
                         casasDecimais = 0; // Valor padrão
                     }
                 } else if (line.startsWith("PE3")) {
-                    // Extrai os itens do pedido
-                    Map<String, Object> pedido = new HashMap<>();
-                    pedido.put("data_criacao", dataCriacaoAtual);
-                    pedido.put("codigo", codigoAtual);
+                 Map<String, Object> pedido = new LinkedHashMap<>(); // Use LinkedHashMap para garantir a ordem
+                 pedido.put("data_criacao", dataCriacaoAtual);
+                 pedido.put("codigo", codigoAtual);
+                 pedido.put("Numero_Pedido_De_Compra", numero_Pedido_De_Compra); // Adicione logo após "codigo"
 
-                    List<Map<String, String>> itens = new ArrayList<>();
-                    for (int i = 0; i < 6; i++) {
-                        int startQuantidade = 11 + (17 * i);
-                        int endQuantidade = startQuantidade + 9;
-                        int startData = 3 + (17 * i);
-                        int endData = startData + 6;
+                 List<Map<String, String>> itens = new ArrayList<>();
+                 for (int i = 0; i < 6; i++) {
+                     int startQuantidade = 11 + (17 * i);
+                     int endQuantidade = startQuantidade + 9;
+                     int startData = 3 + (17 * i);
+                     int endData = startData + 6;
 
-                        String quantidade = formatDecimal(getFieldSafe(line, startQuantidade, endQuantidade), casasDecimais);
-                        String dataEntrega = formatDate(getFieldSafe(line, startData, endData));
-                        
-                        
+                     String quantidade = formatDecimal(getFieldSafe(line, startQuantidade, endQuantidade), casasDecimais);
+                     String dataEntrega = formatDate(getFieldSafe(line, startData, endData));
+
+                     Map<String, String> item = new HashMap<>();
+                     item.put("quantidade", quantidade);
+                     item.put("data_entrega", dataEntrega);
+
+                     itens.add(item);
+                 }
+                 pedido.put("itens", itens);
+                 pedidos.add(pedido);
+             }
 
 
-                        Map<String, String> item = new HashMap<>();
-                        item.put("quantidade", quantidade);
-                        item.put("data_entrega", dataEntrega);
-
-                        itens.add(item);
-                    }
-                    pedido.put("itens", itens);
-                    pedidos.add(pedido);
-                }
             } else {
                 System.err.println("Linha ignorada por ser menor que 128 caracteres: " + line);
             }
